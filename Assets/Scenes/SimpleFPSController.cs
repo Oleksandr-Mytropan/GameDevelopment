@@ -4,7 +4,8 @@ using UnityEngine;
 public class SimpleFPSController : MonoBehaviour
 {
     [Header("Mouse")]
-    public float mouseSensitivity = 150f;
+    public float baseSensitivity = 1.0f; // логічна шкала: 0.3 – 2.0
+    public float dpi = 800f;
     public Transform cameraTransform;
 
     [Header("Movement Speeds")]
@@ -20,15 +21,12 @@ public class SimpleFPSController : MonoBehaviour
 
     [Header("Heights")]
     public float standHeight = 1.8f;
-    public float crouchHeight = 1.2f;
+    public float crouchHeight = 1.5f;
     public float proneHeight = 0.6f;
 
     public float cameraStandY = 1.6f;
-    public float cameraCrouchY = 1.0f;
+    public float cameraCrouchY = 1.3f;
     public float cameraProneY = 0.5f;
-
-    [Header("Smoothness")]
-    public float heightSmooth = 6f;
 
     CharacterController controller;
     Vector3 velocity;
@@ -37,12 +35,11 @@ public class SimpleFPSController : MonoBehaviour
 
     enum MoveState { Stand, Crouch, Prone }
     MoveState currentState = MoveState.Stand;
-    MoveState previousState = MoveState.Stand; // стан до лежання
+    MoveState desiredState = MoveState.Stand;
 
-    bool crouchToggle = false;
-    bool proneToggle = false;
-
-    bool justGotUp = false; // прапорець, щоб пропустити стрибок/toggle після підйому
+    bool crouchToggle;
+    bool proneToggle;
+    bool justGotUp;
 
     void Start()
     {
@@ -55,99 +52,81 @@ public class SimpleFPSController : MonoBehaviour
     {
         GroundCheck();
         HandleStateInput();
-        Look();
         Move();
+        UpdateHeight();
     }
+
+    void LateUpdate()
+    {
+        Look();
+    }
+
+
+    // ================= INPUT =================
 
     void HandleStateInput()
     {
-        // TOGGLE присідання (Ctrl)
+        // Ctrl → crouch
         if (Input.GetKeyDown(KeyCode.LeftControl))
         {
             if (currentState == MoveState.Prone)
             {
-                // лежачи → присідання
                 proneToggle = false;
                 crouchToggle = true;
-                currentState = MoveState.Crouch;
-            }
-            else if (!justGotUp)
-            {
-                crouchToggle = !crouchToggle;
-                currentState = crouchToggle ? MoveState.Crouch : MoveState.Stand;
-            }
-        }
-
-        // TOGGLE лягти (Z)
-        if (Input.GetKeyDown(KeyCode.Z) && !justGotUp)
-        {
-            if (!proneToggle)
-            {
-                // запам'ятати стан до лягання
-                previousState = currentState;
-                proneToggle = true;
-                crouchToggle = false;
-                currentState = MoveState.Prone;
+                currentState = desiredState = MoveState.Crouch;
             }
             else
             {
-                // якщо натиснув Z коли лежиш → піднятись у стоя
+                crouchToggle = !crouchToggle;
+                currentState = desiredState = crouchToggle ? MoveState.Crouch : MoveState.Stand;
+            }
+        }
+
+        // Z → prone
+        if (Input.GetKeyDown(KeyCode.Z))
+        {
+            if (!proneToggle)
+            {
+                proneToggle = true;
+                crouchToggle = false;
+                currentState = desiredState = MoveState.Prone;
+            }
+            else
+            {
                 proneToggle = false;
-                currentState = MoveState.Stand;
+                currentState = desiredState = MoveState.Stand;
                 justGotUp = true;
             }
         }
 
-        // Space → підняття зі стану лежачи або присідання без стрибка
+        // Space → stand (без стрибка)
         if (Input.GetKeyDown(KeyCode.Space))
         {
-            if (currentState == MoveState.Prone)
-            {
-                proneToggle = false;
-                currentState = MoveState.Stand;
-                justGotUp = true;
-            }
-            else if (currentState == MoveState.Crouch)
+            if (currentState == MoveState.Crouch || currentState == MoveState.Prone)
             {
                 crouchToggle = false;
-                currentState = MoveState.Stand;
+                proneToggle = false;
+                currentState = desiredState = MoveState.Stand;
                 justGotUp = true;
             }
         }
     }
 
-
-    void GroundCheck()
-    {
-        isGrounded = Physics.Raycast(
-            transform.position,
-            Vector3.down,
-            controller.height / 2f + 0.2f
-        );
-    }
-
-    void Look()
-    {
-        float mouseX = Input.GetAxis("Mouse X") * mouseSensitivity * Time.deltaTime;
-        float mouseY = Input.GetAxis("Mouse Y") * mouseSensitivity * Time.deltaTime;
-
-        xRotation -= mouseY;
-        xRotation = Mathf.Clamp(xRotation, -80f, 80f);
-
-        cameraTransform.localRotation = Quaternion.Euler(xRotation, 0f, 0f);
-        transform.Rotate(Vector3.up * mouseX);
-    }
+    // ================= MOVEMENT =================
 
     void Move()
     {
+        bool isTransitioning = Mathf.Abs(controller.height - GetTargetHeight()) > 0.05f;
+
         float speed = walkSpeed;
 
-        bool movingForward = Input.GetKey(KeyCode.W);
-        bool pressingShift = Input.GetKey(KeyCode.LeftShift);
-
-        // Біг тільки вперед, стоячи
-        if (currentState == MoveState.Stand && movingForward && pressingShift)
+        if (!isTransitioning &&
+            currentState == MoveState.Stand &&
+            Input.GetKey(KeyCode.W) &&
+            Input.GetKey(KeyCode.LeftShift))
+        {
             speed = runSpeed;
+        }
         else if (currentState == MoveState.Crouch)
             speed = crouchSpeed;
         else if (currentState == MoveState.Prone)
@@ -159,67 +138,94 @@ public class SimpleFPSController : MonoBehaviour
         Vector3 move = transform.right * x + transform.forward * z;
         controller.Move(move * speed * Time.deltaTime);
 
-        // Гравітація
-        if (isGrounded && velocity.y < 0)
-            velocity.y = -3f;
+        if (isGrounded)
+            velocity.y = -2f;
 
-        // Стрибок – пропускаємо один кадр після підйому з лежання
-        if (isGrounded && Input.GetButtonDown("Jump") && currentState == MoveState.Stand && !justGotUp)
+        if (isGrounded && Input.GetButtonDown("Jump") &&
+            currentState == MoveState.Stand && !justGotUp)
         {
             velocity.y = Mathf.Sqrt(jumpForce * -2f * gravity);
         }
 
         if (justGotUp)
-            justGotUp = false; // один кадр після підйому пропускаємо стрибок/тригери
+            justGotUp = false;
 
-        if (velocity.y < 0)
-            velocity.y += gravity * fallMultiplier * Time.deltaTime;
-        else
-            velocity.y += gravity * Time.deltaTime;
-
+        velocity.y += (velocity.y < 0 ? gravity * fallMultiplier : gravity) * Time.deltaTime;
         controller.Move(velocity * Time.deltaTime);
-
-        UpdateHeight();
     }
+
+    // ================= HEIGHT & CAMERA =================
+
     void UpdateHeight()
     {
-        float targetHeight = standHeight;
-        float targetCamY = cameraStandY;
-        float smoothFactor = heightSmooth;
+        float targetHeight = GetTargetHeight();
+        float targetCamY = GetTargetCamY();
 
-        // визначаємо цільову висоту та камеру
-        if (currentState == MoveState.Crouch)
-        {
-            targetHeight = crouchHeight;
-            targetCamY = cameraCrouchY;
-            smoothFactor = 8f; // середній перехід
-        }
-        else if (currentState == MoveState.Prone)
-        {
-            targetHeight = proneHeight;
-            targetCamY = cameraProneY;
-            smoothFactor = 4f; // довгий перехід лежання
-        }
-        else if (previousState == MoveState.Prone && currentState == MoveState.Stand)
-        {
-            smoothFactor = 6f; // стоя після лежання
-        }
+        float distance = Mathf.Abs(controller.height - targetHeight);
+        float smooth = Mathf.Lerp(12f, 3f, distance); // ← прискорення в кінці
 
-        // плавний перехід висоти
-        controller.height = Mathf.Lerp(
-            controller.height,
-            targetHeight,
-            Time.deltaTime * smoothFactor
-        );
+        controller.height = Mathf.Lerp(controller.height, targetHeight, Time.deltaTime * smooth);
 
         Vector3 center = controller.center;
-        center.y = Mathf.Lerp(controller.center.y, targetHeight / 2f, Time.deltaTime * smoothFactor);
+        center.y = Mathf.Lerp(center.y, targetHeight / 2f, Time.deltaTime * smooth);
         controller.center = center;
 
-        // плавний перехід камери
         Vector3 camPos = cameraTransform.localPosition;
-        camPos.y = Mathf.Lerp(camPos.y, targetCamY, Time.deltaTime * smoothFactor);
+        camPos.y = Mathf.Lerp(camPos.y, targetCamY, Time.deltaTime * smooth);
         cameraTransform.localPosition = camPos;
     }
+
+    float GetTargetHeight()
+    {
+        switch (desiredState)
+        {
+            case MoveState.Crouch: return crouchHeight;
+            case MoveState.Prone: return proneHeight;
+            default: return standHeight;
+        }
+    }
+
+    float GetTargetCamY()
+    {
+        switch (desiredState)
+        {
+            case MoveState.Crouch: return cameraCrouchY;
+            case MoveState.Prone: return cameraProneY;
+            default: return cameraStandY;
+        }
+    }
+
+    // ================= UTILS =================
+
+    void GroundCheck()
+    {
+        isGrounded = controller.isGrounded;
+    }
+
+
+    float yRotation;
+
+    float Curve(float x)
+    {
+        return Mathf.Sign(x) * Mathf.Pow(Mathf.Abs(x), 1.2f);
+    }
+
+    void Look()
+    {
+        float dpiFactor = dpi / 800f;
+        float sens = baseSensitivity * dpiFactor * 0.1f;
+
+        float mouseX = Input.GetAxisRaw("Mouse X") * sens;
+        float mouseY = Input.GetAxisRaw("Mouse Y") * sens;
+
+        xRotation -= mouseY;
+        xRotation = Mathf.Clamp(xRotation, -80f, 80f);
+        yRotation += mouseX;
+
+        cameraTransform.localRotation = Quaternion.Euler(xRotation, 0f, 0f);
+        transform.rotation = Quaternion.Euler(0f, yRotation, 0f);
+    }
+
+
 
 }
