@@ -4,7 +4,7 @@ using UnityEngine;
 public class SimpleFPSController : MonoBehaviour
 {
     [Header("Mouse")]
-    public float baseSensitivity = 1.0f; // логічна шкала: 0.3 – 2.0
+    public float baseSensitivity = 1.0f; // 0.6 – 1.2 комфортно при 800 DPI
     public float dpi = 800f;
     public Transform cameraTransform;
 
@@ -30,8 +30,12 @@ public class SimpleFPSController : MonoBehaviour
 
     CharacterController controller;
     Vector3 velocity;
+
     float xRotation;
+    float yRotation;
     bool isGrounded;
+
+    float currentCamY; // ✅ стабілізація камери
 
     enum MoveState { Stand, Crouch, Prone }
     MoveState currentState = MoveState.Stand;
@@ -46,21 +50,18 @@ public class SimpleFPSController : MonoBehaviour
         controller = GetComponent<CharacterController>();
         Cursor.lockState = CursorLockMode.Locked;
         Cursor.visible = false;
+
+        currentCamY = cameraStandY;
     }
 
     void Update()
     {
         GroundCheck();
         HandleStateInput();
+        Look();          // ✅ ТУТ, не LateUpdate
         Move();
         UpdateHeight();
     }
-
-    void LateUpdate()
-    {
-        Look();
-    }
-
 
     // ================= INPUT =================
 
@@ -162,7 +163,7 @@ public class SimpleFPSController : MonoBehaviour
         float targetCamY = GetTargetCamY();
 
         float distance = Mathf.Abs(controller.height - targetHeight);
-        float smooth = Mathf.Lerp(12f, 3f, distance); // ← прискорення в кінці
+        float smooth = Mathf.Lerp(12f, 3f, distance);
 
         controller.height = Mathf.Lerp(controller.height, targetHeight, Time.deltaTime * smooth);
 
@@ -170,8 +171,11 @@ public class SimpleFPSController : MonoBehaviour
         center.y = Mathf.Lerp(center.y, targetHeight / 2f, Time.deltaTime * smooth);
         controller.center = center;
 
+        // ✅ стабілізований Y камери
+        currentCamY = Mathf.Lerp(currentCamY, targetCamY, Time.deltaTime * smooth);
+
         Vector3 camPos = cameraTransform.localPosition;
-        camPos.y = Mathf.Lerp(camPos.y, targetCamY, Time.deltaTime * smooth);
+        camPos.y = currentCamY;
         cameraTransform.localPosition = camPos;
     }
 
@@ -195,25 +199,11 @@ public class SimpleFPSController : MonoBehaviour
         }
     }
 
-    // ================= UTILS =================
-
-    void GroundCheck()
-    {
-        isGrounded = controller.isGrounded;
-    }
-
-
-    float yRotation;
-
-    float Curve(float x)
-    {
-        return Mathf.Sign(x) * Mathf.Pow(Mathf.Abs(x), 1.2f);
-    }
+    // ================= CAMERA =================
 
     void Look()
     {
-        float dpiFactor = dpi / 800f;
-        float sens = baseSensitivity * dpiFactor * 0.1f;
+        float sens = baseSensitivity * (dpi / 800f);
 
         float mouseX = Input.GetAxisRaw("Mouse X") * sens;
         float mouseY = Input.GetAxisRaw("Mouse Y") * sens;
@@ -226,6 +216,10 @@ public class SimpleFPSController : MonoBehaviour
         transform.rotation = Quaternion.Euler(0f, yRotation, 0f);
     }
 
+    // ================= UTILS =================
 
-
+    void GroundCheck()
+    {
+        isGrounded = controller.isGrounded;
+    }
 }

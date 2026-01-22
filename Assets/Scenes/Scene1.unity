@@ -919,21 +919,21 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 263455bacbea7294986a2a8f6db3a1b1, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  baseSensitivity: 4
+  baseSensitivity: 3
   dpi: 800
   cameraTransform: {fileID: 1761064051}
-  walkSpeed: 8
-  runSpeed: 13
+  walkSpeed: 7
+  runSpeed: 12
   crouchSpeed: 2
   proneSpeed: 1.5
   gravity: -28
   jumpForce: 2.2
   fallMultiplier: 2.5
   standHeight: 1.8
-  crouchHeight: 1.5
+  crouchHeight: 1.4
   proneHeight: 0.6
   cameraStandY: 1.6
-  cameraCrouchY: 1.3
+  cameraCrouchY: 1.2
   cameraProneY: 0.5
 --- !u!143 &1835757425
 CharacterController:
