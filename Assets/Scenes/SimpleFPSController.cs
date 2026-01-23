@@ -3,6 +3,8 @@ using UnityEngine;
 [RequireComponent(typeof(CharacterController))]
 public class SimpleFPSController : MonoBehaviour
 {
+    float currentSpeed;
+
     [Header("Camera Bob")]
     Vector3 cameraDefaultLocalPos;
     float bobTimer;
@@ -39,7 +41,7 @@ public class SimpleFPSController : MonoBehaviour
     public float crouchHeight = 1.5f;
     public float proneHeight = 0.6f;
 
-    [Header("Camera height in different modes")]    
+    [Header("Camera height in different modes")]
     public float cameraStandY = 2.1f;
     public float cameraCrouchY = 1.4f;
     public float cameraProneY = 0.55f;
@@ -135,32 +137,41 @@ public class SimpleFPSController : MonoBehaviour
     {
         bool isTransitioning = Mathf.Abs(controller.height - GetTargetHeight()) > 0.05f;
 
-        float speed = walkSpeed;
+        // Базова цільова швидкість
+        float targetSpeed = walkSpeed;
 
-        if (!isTransitioning &&
-            currentState == MoveState.Stand &&
-            Input.GetKey(KeyCode.W) &&
-            Input.GetKey(KeyCode.LeftShift))
-            speed = runSpeed;
+        if (!isTransitioning && currentState == MoveState.Stand)
+        {
+            if (Input.GetKey(KeyCode.W) && Input.GetKey(KeyCode.LeftShift))
+                targetSpeed = runSpeed;
+            else
+                targetSpeed = walkSpeed;
+        }
         else if (currentState == MoveState.Crouch)
-            speed = crouchSpeed;
+            targetSpeed = crouchSpeed;
         else if (currentState == MoveState.Prone)
-            speed = proneSpeed;
+            targetSpeed = proneSpeed;
+
+        // Плавний перехід швидкості
+        float acceleration = 6f;
+        currentSpeed = Mathf.Lerp(currentSpeed, targetSpeed, Time.deltaTime * acceleration);
 
         float x = Input.GetAxisRaw("Horizontal");
         float z = Input.GetAxisRaw("Vertical");
 
         Vector3 move = transform.right * x + transform.forward * z;
-        controller.Move(move * speed * Time.deltaTime);
+
+        // === Нормалізація для діагонального руху ===
+        if (move.magnitude > 1f)
+            move.Normalize();
+
+        controller.Move(move * currentSpeed * Time.deltaTime);
 
         if (isGrounded && velocity.y < 0f)
             velocity.y = -2f;
 
-        if (isGrounded && Input.GetButtonDown("Jump") &&
-            currentState == MoveState.Stand && !justGotUp)
-        {
+        if (isGrounded && Input.GetButtonDown("Jump") && currentState == MoveState.Stand && !justGotUp)
             velocity.y = Mathf.Sqrt(jumpForce * -2f * gravity);
-        }
 
         justGotUp = false;
 
@@ -223,9 +234,13 @@ public class SimpleFPSController : MonoBehaviour
             bobTimer = 0f;
             bobOffsetY = Mathf.Lerp(bobOffsetY, 0f, Time.deltaTime * 10f);
         }
-        Vector3 camPos = cameraDefaultLocalPos;
+        Vector3 camPos = cameraTransform.localPosition;
         camPos.y = currentCamY + bobOffsetY;
-        cameraTransform.localPosition = camPos;
+        cameraTransform.localPosition = Vector3.Lerp(
+            cameraTransform.localPosition,
+            camPos,
+            Time.deltaTime * 12f
+        );
 
         if (Mathf.Abs(controller.height - GetTargetHeight()) < 0.05f)
         {
