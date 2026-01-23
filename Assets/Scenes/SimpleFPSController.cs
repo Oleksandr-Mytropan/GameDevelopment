@@ -3,29 +3,45 @@ using UnityEngine;
 [RequireComponent(typeof(CharacterController))]
 public class SimpleFPSController : MonoBehaviour
 {
+    [Header("Camera Bob")]
+    Vector3 cameraDefaultLocalPos;
+    float bobTimer;
+    float bobOffsetY;
+
+    public float bobSpeedWalk = 10f;
+    public float bobSpeedRun = 13f;
+    public float bobSpeedCrouch = 8f;
+    public float bobSpeedProne = 5f;
+
+    public float bobAmountWalk = 0.1f;
+    public float bobAmountRun = 0.12f;
+    public float bobAmountCrouch = 0.08f;
+    public float bobAmountProne = 0.06f;
+
     [Header("Mouse")]
-    public float baseSensitivity = 1.0f; // 0.6 – 1.2 комфортно при 800 DPI
+    public float baseSensitivity = 3.0f;
     public float dpi = 800f;
     public Transform cameraTransform;
 
     [Header("Movement Speeds")]
-    public float walkSpeed = 4f;
-    public float runSpeed = 7f;
-    public float crouchSpeed = 2f;
+    public float walkSpeed = 6.5f;
+    public float runSpeed = 10.8f;
+    public float crouchSpeed = 4f;
     public float proneSpeed = 1.5f;
 
     [Header("Jump & Gravity")]
-    public float gravity = -45f;
-    public float jumpForce = 3.0f;
-    public float fallMultiplier = 3.5f;
+    public float gravity = -28f;
+    public float jumpForce = 2.2f;
+    public float fallMultiplier = 2.5f;
 
     [Header("Heights")]
     public float standHeight = 1.8f;
     public float crouchHeight = 1.5f;
     public float proneHeight = 0.6f;
 
-    public float cameraStandY = 1.6f;
-    public float cameraCrouchY = 1.3f;
+    [Header("Camera height in different modes")]
+    public float cameraStandY = 2.0f;
+    public float cameraCrouchY = 1.4f;
     public float cameraProneY = 0.5f;
 
     CharacterController controller;
@@ -35,7 +51,7 @@ public class SimpleFPSController : MonoBehaviour
     float yRotation;
     bool isGrounded;
 
-    float currentCamY; // ✅ стабілізація камери
+    float currentCamY;
 
     enum MoveState { Stand, Crouch, Prone }
     MoveState currentState = MoveState.Stand;
@@ -48,66 +64,66 @@ public class SimpleFPSController : MonoBehaviour
     void Start()
     {
         controller = GetComponent<CharacterController>();
+
         Cursor.lockState = CursorLockMode.Locked;
         Cursor.visible = false;
 
         currentCamY = cameraStandY;
+        cameraDefaultLocalPos = cameraTransform.localPosition;
+        currentCamY = cameraDefaultLocalPos.y;
     }
 
     void Update()
     {
         GroundCheck();
         HandleStateInput();
-        Look();          // ✅ ТУТ, не LateUpdate
+        Look();
         Move();
-        UpdateHeight();
+        UpdateHeightAndCamera();
     }
 
     // ================= INPUT =================
 
     void HandleStateInput()
     {
-        // Ctrl → crouch
         if (Input.GetKeyDown(KeyCode.LeftControl))
         {
             if (currentState == MoveState.Prone)
             {
                 proneToggle = false;
                 crouchToggle = true;
-                currentState = desiredState = MoveState.Crouch;
+                desiredState = MoveState.Crouch;
             }
             else
             {
                 crouchToggle = !crouchToggle;
-                currentState = desiredState = crouchToggle ? MoveState.Crouch : MoveState.Stand;
+                desiredState = crouchToggle ? MoveState.Crouch : MoveState.Stand;
             }
         }
 
-        // Z → prone
         if (Input.GetKeyDown(KeyCode.Z))
         {
             if (!proneToggle)
             {
                 proneToggle = true;
                 crouchToggle = false;
-                currentState = desiredState = MoveState.Prone;
+                desiredState = MoveState.Prone;
             }
             else
             {
                 proneToggle = false;
-                currentState = desiredState = MoveState.Stand;
+                desiredState = MoveState.Stand;
                 justGotUp = true;
             }
         }
 
-        // Space → stand (без стрибка)
         if (Input.GetKeyDown(KeyCode.Space))
         {
-            if (currentState == MoveState.Crouch || currentState == MoveState.Prone)
+            if (currentState != MoveState.Stand)
             {
                 crouchToggle = false;
                 proneToggle = false;
-                currentState = desiredState = MoveState.Stand;
+                desiredState = MoveState.Stand;
                 justGotUp = true;
             }
         }
@@ -125,21 +141,19 @@ public class SimpleFPSController : MonoBehaviour
             currentState == MoveState.Stand &&
             Input.GetKey(KeyCode.W) &&
             Input.GetKey(KeyCode.LeftShift))
-        {
             speed = runSpeed;
-        }
         else if (currentState == MoveState.Crouch)
             speed = crouchSpeed;
         else if (currentState == MoveState.Prone)
             speed = proneSpeed;
 
-        float x = Input.GetAxis("Horizontal");
-        float z = Input.GetAxis("Vertical");
+        float x = Input.GetAxisRaw("Horizontal");
+        float z = Input.GetAxisRaw("Vertical");
 
         Vector3 move = transform.right * x + transform.forward * z;
         controller.Move(move * speed * Time.deltaTime);
 
-        if (isGrounded)
+        if (isGrounded && velocity.y < 0f)
             velocity.y = -2f;
 
         if (isGrounded && Input.GetButtonDown("Jump") &&
@@ -148,22 +162,21 @@ public class SimpleFPSController : MonoBehaviour
             velocity.y = Mathf.Sqrt(jumpForce * -2f * gravity);
         }
 
-        if (justGotUp)
-            justGotUp = false;
+        justGotUp = false;
 
         velocity.y += (velocity.y < 0 ? gravity * fallMultiplier : gravity) * Time.deltaTime;
         controller.Move(velocity * Time.deltaTime);
     }
 
-    // ================= HEIGHT & CAMERA =================
+    // ================= HEIGHT + CAMERA =================
 
-    void UpdateHeight()
+    void UpdateHeightAndCamera()
     {
         float targetHeight = GetTargetHeight();
         float targetCamY = GetTargetCamY();
 
         float distance = Mathf.Abs(controller.height - targetHeight);
-        float smooth = Mathf.Lerp(12f, 3f, distance);
+        float smooth = Mathf.Lerp(12f, 4f, distance);
 
         controller.height = Mathf.Lerp(controller.height, targetHeight, Time.deltaTime * smooth);
 
@@ -171,12 +184,54 @@ public class SimpleFPSController : MonoBehaviour
         center.y = Mathf.Lerp(center.y, targetHeight / 2f, Time.deltaTime * smooth);
         controller.center = center;
 
-        // ✅ стабілізований Y камери
         currentCamY = Mathf.Lerp(currentCamY, targetCamY, Time.deltaTime * smooth);
 
-        Vector3 camPos = cameraTransform.localPosition;
-        camPos.y = currentCamY;
+        // ===== HEAD BOB =====
+        float inputMagnitude = new Vector2(
+            Input.GetAxisRaw("Horizontal"),
+            Input.GetAxisRaw("Vertical")
+        ).magnitude;
+
+        bool isMoving = inputMagnitude > 0.1f && isGrounded;
+
+        if (isMoving)
+        {
+            float bobSpeed = bobSpeedWalk;
+            float bobAmount = bobAmountWalk;
+
+            if (currentState == MoveState.Stand && Input.GetKey(KeyCode.LeftShift))
+            {
+                bobSpeed = bobSpeedRun;
+                bobAmount = bobAmountRun;
+            }
+            else if (currentState == MoveState.Crouch)
+            {
+                bobSpeed = bobSpeedCrouch;
+                bobAmount = bobAmountCrouch;
+            }
+            else if (currentState == MoveState.Prone)
+            {
+                bobSpeed = bobSpeedProne;
+                bobAmount = bobAmountProne;
+            }
+
+            bobTimer += Time.deltaTime * bobSpeed;
+            bobOffsetY = Mathf.Sin(bobTimer) * bobAmount;
+        }
+        else
+        {
+            bobTimer = 0f;
+            bobOffsetY = Mathf.Lerp(bobOffsetY, 0f, Time.deltaTime * 10f);
+        }
+        Vector3 camPos = cameraDefaultLocalPos;
+        camPos.y = currentCamY + bobOffsetY;
         cameraTransform.localPosition = camPos;
+
+        if (Mathf.Abs(controller.height - GetTargetHeight()) < 0.05f)
+        {
+            currentState = desiredState;
+        }
+
     }
 
     float GetTargetHeight()
@@ -199,7 +254,7 @@ public class SimpleFPSController : MonoBehaviour
         }
     }
 
-    // ================= CAMERA =================
+    // ================= CAMERA LOOK =================
 
     void Look()
     {
@@ -215,8 +270,6 @@ public class SimpleFPSController : MonoBehaviour
         cameraTransform.localRotation = Quaternion.Euler(xRotation, 0f, 0f);
         transform.rotation = Quaternion.Euler(0f, yRotation, 0f);
     }
-
-    // ================= UTILS =================
 
     void GroundCheck()
     {
