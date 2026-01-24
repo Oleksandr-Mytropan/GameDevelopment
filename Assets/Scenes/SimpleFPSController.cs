@@ -37,14 +37,14 @@ public class SimpleFPSController : MonoBehaviour
     public float fallMultiplier = 2.5f;
 
     [Header("Heights")]
-    public float standHeight = 1.9f;
-    public float crouchHeight = 1.5f;
-    public float proneHeight = 0.6f;
+    public float standHeight = 2.3f;
+    public float crouchHeight = 1.65f;
+    public float proneHeight = 1f;
 
     [Header("Camera height in different modes")]
     public float cameraStandY = 2.1f;
-    public float cameraCrouchY = 1.4f;
-    public float cameraProneY = 0.55f;
+    public float cameraCrouchY = 1.45f;
+    public float cameraProneY = 0.8f;
 
     CharacterController controller;
     Vector3 velocity;
@@ -269,7 +269,7 @@ public class SimpleFPSController : MonoBehaviour
         }
     }
 
-    // ================= CAMERA LOOK =================
+    // ================= CAMERA LOOK ==================
 
     void Look()
     {
