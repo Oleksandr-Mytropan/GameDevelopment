@@ -293,7 +293,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   cameraTransform: {fileID: 1657153172}
-  meshRoot: {fileID: 0}
+  meshRoot: {fileID: 266583949}
   animator: {fileID: 266583950}
   baseSensitivity: 3
   dpi: 800
@@ -329,8 +329,8 @@ MonoBehaviour:
     m_Bits: 4294967295
   footIkWeight: 1
   footIkSmoothTime: 0.08
-  headBone: {fileID: 0}
-  spineBone: {fileID: 0}
+  headBone: {fileID: 1338509250}
+  spineBone: {fileID: 899221478}
   spineRotationWeight: 0.4
 --- !u!4 &266583949 stripped
 Transform:
@@ -659,6 +659,16 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!4 &899221478 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: -8795898045768072948, guid: 662e4dd74e8965041a075bc1b5e2a5fc, type: 3}
+  m_PrefabInstance: {fileID: 772012936}
+  m_PrefabAsset: {fileID: 0}
+--- !u!4 &1338509250 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 7827193014665614702, guid: 662e4dd74e8965041a075bc1b5e2a5fc, type: 3}
+  m_PrefabInstance: {fileID: 772012936}
+  m_PrefabAsset: {fileID: 0}
 --- !u!1 &1576555659
 GameObject:
   m_ObjectHideFlags: 0
