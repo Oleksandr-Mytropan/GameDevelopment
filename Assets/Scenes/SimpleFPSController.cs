@@ -364,9 +364,11 @@ public class FullBodyFpsController : MonoBehaviour
         // Використовуємо збережений напрямок руху замість controller.velocity
         Vector3 localVel = transform.InverseTransformDirection(currentMoveDirection * currentSpeed);
 
-        bool isSprinting = currentState == MoveState.Stand && Input.GetKey(KeyCode.LeftShift);
+        bool isSprinting = desiredState == MoveState.Stand && Input.GetKey(KeyCode.LeftShift);
         bool isProne = currentState == MoveState.Prone;
         bool isCrouched = currentState == MoveState.Crouch;
+        bool isCrouchedAnim = desiredState == MoveState.Crouch;
+        bool isProneAnim = desiredState == MoveState.Prone;
 
         float maxSpeed = isProne ? proneSpeed : isCrouched ? crouchSpeed : isSprinting ? runSpeed : walkSpeed;
         float moveX = Mathf.Clamp(localVel.x / maxSpeed, -1f, 1f);
@@ -375,6 +377,8 @@ public class FullBodyFpsController : MonoBehaviour
         animator.SetFloat("MoveX", moveX, 0.1f, Time.deltaTime);
         animator.SetFloat("MoveY", moveY, 0.1f, Time.deltaTime);
         animator.SetBool("Sprint", isSprinting);
+        animator.SetBool("Crouch", isCrouchedAnim);
+        animator.SetBool("Prone", isProneAnim);
         animator.SetBool("IsGrounded", controller.isGrounded);
     }
 
